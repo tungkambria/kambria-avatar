@@ -393,12 +393,11 @@ const ProfilePictureBuilder = () => {
               </li>
             </ul>
           </div>
-          <div className="mb-3">
+          <div className="mb-3 d-flex justify-content-between gap-1">
             <Button
               variant="secondary"
               onClick={handleReset}
               disabled={!sourceImage}
-              className="me-2"
             >
               <FontAwesomeIcon icon={faSyncAlt} className="me-2" />
               {t("reset")}
@@ -407,7 +406,6 @@ const ProfilePictureBuilder = () => {
               variant="secondary"
               onClick={handleUndo}
               disabled={!sourceImage || history.length === 0}
-              className="me-2"
             >
               <FontAwesomeIcon icon={faUndo} className="me-2" />
               {t("undo")}
