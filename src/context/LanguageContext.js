@@ -15,6 +15,7 @@ const translations = {
     download: "Download Profile Picture",
     scale: "Scale",
     position: "Position",
+    selectFrame: "Select Frame",
   },
   vi: {
     title: "Trình tạo ảnh đại diện Facebook",
@@ -30,6 +31,7 @@ const translations = {
     download: "Tải ảnh đại diện",
     scale: "Tỷ lệ",
     position: "Vị trí",
+    selectFrame: "Chọn khung",
   },
 };
 

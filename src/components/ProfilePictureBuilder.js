@@ -9,16 +9,27 @@ import {
   faDownload,
   faMousePointer,
   faMobileAlt,
+  faBorderAll,
 } from "@fortawesome/free-solid-svg-icons";
 import { LanguageContext } from "../context/LanguageContext";
 
+// Define preset frames
+const presetFrames = [
+  { name: "None", url: null },
+  { name: "Heart Frame", url: "/frames/heart.png" },
+  { name: "Circle 1 Frame", url: "/frames/circle-1.png" },
+  { name: "Circle 2 Frame", url: "/frames/circle-2.png" },
+  { name: "Circle 3 Frame", url: "/frames/circle-3.png" },
+  { name: "Circle 4 Frame", url: "/frames/circle-4.png" },
+];
+
 const ProfilePictureBuilder = () => {
-  // Access language context
   const { language, setLanguage, t } = useContext(LanguageContext);
 
   // State for images and adjustments
   const [sourceImage, setSourceImage] = useState(null);
   const [frameImage, setFrameImage] = useState(null);
+  const [selectedPreset, setSelectedPreset] = useState("None"); // New state for preset selection
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [history, setHistory] = useState([]);
@@ -84,8 +95,17 @@ const ProfilePictureBuilder = () => {
     if (file) {
       preprocessImage(file, (url) => {
         setFrameImage(url);
+        setSelectedPreset("None"); // Reset preset selection when uploading custom frame
       });
     }
+  };
+
+  // Handle preset frame selection
+  const handlePresetChange = (e) => {
+    const presetName = e.target.value;
+    setSelectedPreset(presetName);
+    const preset = presetFrames.find((frame) => frame.name === presetName);
+    setFrameImage(preset.url);
   };
 
   // Draw images on canvas
@@ -148,7 +168,7 @@ const ProfilePictureBuilder = () => {
   // Handle touch drag and pinch
   const handleTouchStart = (e) => {
     if (!sourceImage) return;
-    e.preventDefault();
+    e.preventDefault(); // Prevent default browser behavior (scroll, zoom)
     saveToHistory();
     const touches = e.touches;
     if (touches.length === 1) {
@@ -183,13 +203,31 @@ const ProfilePictureBuilder = () => {
         const scaleChange = newDistance / pinchDistance.current;
         let newScale = scale * scaleChange;
         newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
+
+        // Adjust position to zoom around pinch center
+        const pinchCenterX = (touches[0].clientX + touches[1].clientX) / 2;
+        const pinchCenterY = (touches[0].clientY + touches[1].clientY) / 2;
+        const canvasRect = canvasRef.current.getBoundingClientRect();
+        const canvasX = pinchCenterX - canvasRect.left - CANVAS_SIZE / 2;
+        const canvasY = pinchCenterY - canvasRect.top - CANVAS_SIZE / 2;
+
+        const newPositionX =
+          position.x + (canvasX / scale - canvasX / newScale);
+        const newPositionY =
+          position.y + (canvasY / scale - canvasY / newScale);
+
         setScale(newScale);
+        setPosition({
+          x: Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, newPositionX)),
+          y: Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, newPositionY)),
+        });
       }
       pinchDistance.current = newDistance;
     }
   };
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (e) => {
+    e.preventDefault(); // Prevent default behavior on touch end
     isDragging.current = false;
     pinchDistance.current = null;
   };
@@ -263,6 +301,7 @@ const ProfilePictureBuilder = () => {
   });
 
   // Reset and undo
+  // Reset and undo
   const handleReset = () => {
     saveToHistory();
     setScale(1);
@@ -314,6 +353,19 @@ const ProfilePictureBuilder = () => {
               accept="image/*"
               onChange={handleSourceUpload}
             />
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>
+              <FontAwesomeIcon icon={faBorderAll} className="me-2" />
+              {t("selectFrame")}
+            </Form.Label>
+            <Form.Select value={selectedPreset} onChange={handlePresetChange}>
+              {presetFrames.map((frame) => (
+                <option key={frame.name} value={frame.name}>
+                  {frame.name}
+                </option>
+              ))}
+            </Form.Select>
           </Form.Group>
           <Form.Group className="mb-3">
             <Form.Label>
@@ -383,7 +435,10 @@ const ProfilePictureBuilder = () => {
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
-            style={{ cursor: sourceImage ? "move" : "default" }}
+            style={{
+              cursor: sourceImage ? "move" : "default",
+              touchAction: "none",
+            }}
           ></canvas>
           <div className="mt-2">
             <small>
