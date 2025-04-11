@@ -1,0 +1,142 @@
+/* Define a color palette for a friendly and professional look */
+:root {
+  --primary-color: #007bff !important; /* Bright blue for actions */
+  --secondary-color: #6c757d !important; /* Neutral gray for secondary elements */
+  --accent-color: #e9ecef !important; /* Light gray for backgrounds */
+  --text-color: #333 !important; /* Dark text for readability */
+  --success-color: #28a745 !important; /* Green for positive actions */
+  --border-radius: 8px !important; /* Rounded corners for friendliness */
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important; /* Subtle shadow for depth */
+  --transition: all 0.2s ease !important; /* Smooth transitions */
+}
+
+/* Reset default margins and ensure smooth rendering */
+body {
+  margin: 0 !important;
+  font-family: "Questrial", sans-serif !important;
+  color: var(--text-color) !important;
+  background-color: #f8f9fa !important;
+  line-height: 1.6 !important;
+}
+
+/* Container for consistent width and padding */
+.container {
+  max-width: 1280px !important;
+  margin: 0 auto !important;
+  padding: 2rem 1rem !important;
+}
+
+/* Canvas styling for a polished preview */
+.canvas-preview {
+  border: 2px solid var(--accent-color) !important;
+  border-radius: var(--border-radius) !important;
+  box-shadow: var(--shadow) !important;
+  max-width: 100% !important;
+  background-color: #fff !important;
+  transition: var(--transition) !important;
+}
+
+.canvas-preview:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Buttons with friendly and accessible styling */
+.btn {
+  padding: 0.75rem 1.5rem !important;
+  border-radius: var(--border-radius) !important;
+  font-weight: 500 !important;
+  transition: var(--transition) !important;
+}
+
+.btn-primary {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+}
+
+.btn-primary:hover {
+  background-color: #0056b3 !important;
+  border-color: #0056b3 !important;
+}
+
+.btn-secondary {
+  background-color: var(--secondary-color) !important;
+  border-color: var(--secondary-color) !important;
+}
+
+.btn-secondary:hover {
+  background-color: #5a6268 !important;
+  border-color: #5a6268 !important;
+}
+
+.btn-success {
+  background-color: var(--success-color) !important;
+  border-color: var(--success-color) !important;
+}
+
+.btn-success:hover {
+  background-color: #218838 !important;
+  border-color: #218838 !important;
+}
+
+.btn + .btn {
+  margin-left: 0.75rem !important;
+}
+
+/* Form elements for consistency */
+.form-control {
+  border-radius: var(--border-radius) !important;
+  border: 1px solid #ced4da !important;
+  padding: 0.75rem !important;
+  transition: var(--transition) !important;
+}
+
+.form-control:focus {
+  border-color: var(--primary-color) !important;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important;
+}
+
+/* Typography for headers and labels */
+h1 {
+  font-size: 2rem !important;
+  font-weight: 700 !important;
+  color: var(--text-color) !important;
+  margin-bottom: 1.5rem !important;
+}
+
+.form-label {
+  font-weight: 500 !important;
+  color: var(--text-color) !important;
+  margin-bottom: 0.5rem !important;
+}
+
+/* Instructions list for clarity */
+.instructions {
+  background-color: var(--accent-color) !important;
+  padding: 1rem !important;
+  border-radius: var(--border-radius) !important;
+  margin-bottom: 1.5rem !important;
+}
+
+.instructions ul {
+  margin: 0 !important;
+  padding-left: 1.25rem !important;
+}
+
+.instructions li {
+  margin-bottom: 0.5rem !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  h1 {
+    font-size: 1.5rem !important;
+  }
+
+  .btn {
+    padding: 0.5rem 1rem !important;
+  }
+
+  .container {
+    padding: 1rem !important;
+  }
+}
