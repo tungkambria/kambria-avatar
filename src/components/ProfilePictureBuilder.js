@@ -15,12 +15,11 @@ import { LanguageContext } from "../context/LanguageContext";
 
 // Define preset frames
 const presetFrames = [
-  { name: "None", url: null },
-  { name: "Heart Frame", url: "/frames/heart.png" },
-  { name: "Circle 1 Frame", url: "/frames/circle-1.png" },
-  { name: "Circle 2 Frame", url: "/frames/circle-2.png" },
-  { name: "Circle 3 Frame", url: "/frames/circle-3.png" },
-  { name: "Circle 4 Frame", url: "/frames/circle-4.png" },
+  { name: "Heart", url: "/frames/heart.png" },
+  { name: "Circle 1", url: "/frames/circle-1.png" },
+  { name: "Circle 2", url: "/frames/circle-2.png" },
+  { name: "Circle 3", url: "/frames/circle-3.png" },
+  { name: "Circle 4", url: "/frames/circle-4.png" },
 ];
 
 const ProfilePictureBuilder = () => {
@@ -398,7 +397,6 @@ const ProfilePictureBuilder = () => {
                         {frame.name}
                       </div>
                     )}
-                    <small>{frame.name}</small>
                   </div>
                 </Col>
               ))}
