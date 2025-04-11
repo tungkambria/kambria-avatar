@@ -29,7 +29,7 @@ const ProfilePictureBuilder = () => {
   // State for images and adjustments
   const [sourceImage, setSourceImage] = useState(null);
   const [frameImage, setFrameImage] = useState(null);
-  const [selectedPreset, setSelectedPreset] = useState("None"); // New state for preset selection
+  const [selectedPreset, setSelectedPreset] = useState("None");
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [history, setHistory] = useState([]);
@@ -101,8 +101,7 @@ const ProfilePictureBuilder = () => {
   };
 
   // Handle preset frame selection
-  const handlePresetChange = (e) => {
-    const presetName = e.target.value;
+  const handlePresetSelect = (presetName) => {
     setSelectedPreset(presetName);
     const preset = presetFrames.find((frame) => frame.name === presetName);
     setFrameImage(preset.url);
@@ -168,7 +167,7 @@ const ProfilePictureBuilder = () => {
   // Handle touch drag and pinch
   const handleTouchStart = (e) => {
     if (!sourceImage) return;
-    e.preventDefault(); // Prevent default browser behavior (scroll, zoom)
+    e.preventDefault();
     saveToHistory();
     const touches = e.touches;
     if (touches.length === 1) {
@@ -204,7 +203,6 @@ const ProfilePictureBuilder = () => {
         let newScale = scale * scaleChange;
         newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
 
-        // Adjust position to zoom around pinch center
         const pinchCenterX = (touches[0].clientX + touches[1].clientX) / 2;
         const pinchCenterY = (touches[0].clientY + touches[1].clientY) / 2;
         const canvasRect = canvasRef.current.getBoundingClientRect();
@@ -227,7 +225,7 @@ const ProfilePictureBuilder = () => {
   };
 
   const handleTouchEnd = (e) => {
-    e.preventDefault(); // Prevent default behavior on touch end
+    e.preventDefault();
     isDragging.current = false;
     pinchDistance.current = null;
   };
@@ -301,7 +299,6 @@ const ProfilePictureBuilder = () => {
   });
 
   // Reset and undo
-  // Reset and undo
   const handleReset = () => {
     saveToHistory();
     setScale(1);
@@ -359,13 +356,53 @@ const ProfilePictureBuilder = () => {
               <FontAwesomeIcon icon={faBorderAll} className="me-2" />
               {t("selectFrame")}
             </Form.Label>
-            <Form.Select value={selectedPreset} onChange={handlePresetChange}>
+            <Row>
               {presetFrames.map((frame) => (
-                <option key={frame.name} value={frame.name}>
-                  {frame.name}
-                </option>
+                <Col xs={4} key={frame.name} className="mb-2">
+                  <div
+                    className={`preset-frame ${
+                      selectedPreset === frame.name ? "selected" : ""
+                    }`}
+                    onClick={() => handlePresetSelect(frame.name)}
+                    style={{ cursor: "pointer", textAlign: "center" }}
+                  >
+                    {frame.url ? (
+                      <img
+                        src={frame.url}
+                        alt={frame.name}
+                        style={{
+                          width: "100px",
+                          height: "100px",
+                          objectFit: "cover",
+                          border:
+                            selectedPreset === frame.name
+                              ? "2px solid #007bff"
+                              : "none",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: "100px",
+                          height: "100px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          background: "#f0f0f0",
+                          border:
+                            selectedPreset === frame.name
+                              ? "2px solid #007bff"
+                              : "1px solid #ccc",
+                        }}
+                      >
+                        {frame.name}
+                      </div>
+                    )}
+                    <small>{frame.name}</small>
+                  </div>
+                </Col>
               ))}
-            </Form.Select>
+            </Row>
           </Form.Group>
           <Form.Group className="mb-3">
             <Form.Label>
