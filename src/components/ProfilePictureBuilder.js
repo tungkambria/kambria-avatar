@@ -20,6 +20,7 @@ const presetFrames = [
   { name: "Circle 2", url: "/frames/circle-2.png" },
   { name: "Circle 3", url: "/frames/circle-3.png" },
   { name: "Circle 4", url: "/frames/circle-4.png" },
+  { name: "Circle 5", url: "/frames/circle-5.png" },
 ];
 
 const ProfilePictureBuilder = () => {
