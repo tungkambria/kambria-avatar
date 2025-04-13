@@ -575,7 +575,7 @@ const ProfilePictureBuilder = () => {
         </Col>
       </Row>
       <Row className="text-center mt-5 mb-3">
-        <Col>
+        <Col className="d-flex justify-content-center gap-1">
           <Button
             variant="secondary"
             onClick={handleReset}
