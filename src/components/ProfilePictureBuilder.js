@@ -19,8 +19,8 @@ import {
   faBorderAll,
   faSearchPlus, // New import for zoom in
   faSearchMinus, // New import for zoom out
-  faRedo, // New import for rotate right
-  faUndo as faUndoIcon, // Alias for rotate left
+  faRotateLeft,
+  faRotateRight, // Alias for rotate left
 } from "@fortawesome/free-solid-svg-icons";
 import { LanguageContext } from "../context/LanguageContext";
 
@@ -545,7 +545,7 @@ const ProfilePictureBuilder = () => {
                   disabled={!sourceImage}
                   className="p-1"
                 >
-                  <FontAwesomeIcon icon={faUndoIcon} />
+                  <FontAwesomeIcon icon={faRotateLeft} />
                 </Button>
                 <FormControl
                   type="range"
@@ -562,7 +562,7 @@ const ProfilePictureBuilder = () => {
                   disabled={!sourceImage}
                   className="p-1"
                 >
-                  <FontAwesomeIcon icon={faRedo} />
+                  <FontAwesomeIcon icon={faRotateRight} />
                 </Button>
               </div>
             </Form.Group>
