@@ -1,5 +1,12 @@
 import React, { useState, useRef, useEffect, useContext } from "react";
-import { Container, Row, Col, Button, Form } from "react-bootstrap";
+import {
+  Container,
+  Row,
+  Col,
+  Button,
+  Form,
+  FormControl,
+} from "react-bootstrap";
 import { saveAs } from "file-saver";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -10,10 +17,13 @@ import {
   faMousePointer,
   faMobileAlt,
   faBorderAll,
+  faSearchPlus, // New import for zoom in
+  faSearchMinus, // New import for zoom out
+  faRedo, // New import for rotate right
+  faUndo as faUndoIcon, // Alias for rotate left
 } from "@fortawesome/free-solid-svg-icons";
 import { LanguageContext } from "../context/LanguageContext";
 
-// Define preset frames
 const presetFrames = [
   { name: "Circle 0", url: "/frames/circle-0.png" },
   { name: "Circle 1", url: "/frames/circle-1.png" },
@@ -26,34 +36,37 @@ const presetFrames = [
 const ProfilePictureBuilder = () => {
   const { language, setLanguage, t } = useContext(LanguageContext);
 
-  // State for images and adjustments
   const [sourceImage, setSourceImage] = useState(null);
   const [frameImage, setFrameImage] = useState(null);
   const [selectedPreset, setSelectedPreset] = useState("None");
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [rotation, setRotation] = useState(0); // New state for rotation (degrees)
   const [history, setHistory] = useState([]);
   const canvasRef = useRef(null);
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
   const pinchDistance = useRef(null);
+  const [zoomValue, setZoomValue] = useState(100); // Zoom slider percentage
 
-  // Constants
   const CANVAS_SIZE = 400;
   const MAX_OFFSET = 100;
   const MIN_SCALE = 0.2;
   const MAX_SCALE = 5;
   const MAX_IMAGE_SIZE = 1024;
 
-  // Save state to history
+  // Sync zoom slider with scale changes
+  useEffect(() => {
+    setZoomValue((scale * 100).toFixed(0));
+  }, [scale]);
+
   const saveToHistory = () => {
     setHistory((prev) => [
       ...prev.slice(-9),
-      { scale, position: { ...position } },
+      { scale, position: { ...position }, rotation }, // Include rotation in history
     ]);
   };
 
-  // Handle image uploads with preprocessing
   const preprocessImage = (file, callback) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -84,7 +97,9 @@ const ProfilePictureBuilder = () => {
       preprocessImage(file, (url) => {
         setSourceImage(url);
         setScale(1);
+        setZoomValue(100);
         setPosition({ x: 0, y: 0 });
+        setRotation(0); // Reset rotation
         setHistory([]);
       });
     }
@@ -95,19 +110,32 @@ const ProfilePictureBuilder = () => {
     if (file) {
       preprocessImage(file, (url) => {
         setFrameImage(url);
-        setSelectedPreset("None"); // Reset preset selection when uploading custom frame
+        setSelectedPreset("None");
       });
     }
   };
 
-  // Handle preset frame selection
   const handlePresetSelect = (presetName) => {
     setSelectedPreset(presetName);
     const preset = presetFrames.find((frame) => frame.name === presetName);
     setFrameImage(preset.url);
   };
 
-  // Draw images on canvas
+  const handleZoomChange = (e) => {
+    const newZoom = Number(e.target.value);
+    setZoomValue(newZoom);
+    const newScale = newZoom / 100;
+    saveToHistory();
+    setScale(Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale)));
+  };
+
+  // New handler for rotation slider
+  const handleRotationChange = (e) => {
+    const newRotation = Number(e.target.value);
+    saveToHistory();
+    setRotation(newRotation);
+  };
+
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
@@ -120,6 +148,12 @@ const ProfilePictureBuilder = () => {
         await img.decode();
         const scaledWidth = img.width * scale;
         const scaledHeight = img.height * scale;
+        ctx.save(); // Save context state
+        // Translate to canvas center, rotate, then translate back
+        ctx.translate(CANVAS_SIZE / 2, CANVAS_SIZE / 2);
+        ctx.rotate((rotation * Math.PI) / 180); // Convert degrees to radians
+        ctx.translate(-CANVAS_SIZE / 2, -CANVAS_SIZE / 2);
+        // Draw image with position offset
         ctx.drawImage(
           img,
           position.x + (CANVAS_SIZE - scaledWidth) / 2,
@@ -127,6 +161,7 @@ const ProfilePictureBuilder = () => {
           scaledWidth,
           scaledHeight
         );
+        ctx.restore(); // Restore context state
       }
       if (frameImage) {
         const frame = new Image();
@@ -137,9 +172,8 @@ const ProfilePictureBuilder = () => {
     };
 
     drawImages();
-  }, [sourceImage, frameImage, scale, position]);
+  }, [sourceImage, frameImage, scale, position, rotation]); // Added rotation dependency
 
-  // Handle mouse drag
   const handleMouseDown = (e) => {
     if (!sourceImage) return;
     isDragging.current = true;
@@ -164,7 +198,6 @@ const ProfilePictureBuilder = () => {
     isDragging.current = false;
   };
 
-  // Handle touch drag and pinch
   const handleTouchStart = (e) => {
     if (!sourceImage) return;
     e.preventDefault();
@@ -230,7 +263,6 @@ const ProfilePictureBuilder = () => {
     pinchDistance.current = null;
   };
 
-  // Handle scroll-to-zoom
   const handleWheel = (e) => {
     if (!sourceImage) return;
     e.preventDefault();
@@ -242,7 +274,6 @@ const ProfilePictureBuilder = () => {
     setScale(newScale);
   };
 
-  // Handle keyboard controls
   const handleKeyDown = (e) => {
     if (!sourceImage) return;
     const step = 5;
@@ -287,7 +318,6 @@ const ProfilePictureBuilder = () => {
     }
   };
 
-  // Attach event listeners
   useEffect(() => {
     const canvas = canvasRef.current;
     canvas.addEventListener("wheel", handleWheel, { passive: false });
@@ -296,13 +326,14 @@ const ProfilePictureBuilder = () => {
       canvas.removeEventListener("wheel", handleWheel);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  });
+  }); // Dependencies unchanged
 
-  // Reset and undo
   const handleReset = () => {
     saveToHistory();
     setScale(1);
+    setZoomValue(100);
     setPosition({ x: 0, y: 0 });
+    setRotation(0); // Reset rotation
   };
 
   const handleUndo = () => {
@@ -310,15 +341,41 @@ const ProfilePictureBuilder = () => {
     const lastState = history[history.length - 1];
     setScale(lastState.scale);
     setPosition({ ...lastState.position });
+    setRotation(lastState.rotation); // Restore rotation
     setHistory((prev) => prev.slice(0, -1));
   };
 
-  // Download the final image
   const handleDownload = () => {
     const canvas = canvasRef.current;
     canvas.toBlob((blob) => {
       saveAs(blob, "fb-profile-picture.png");
     });
+  };
+
+  const handleZoomIn = () => {
+    if (!sourceImage) return;
+    saveToHistory();
+    const newScale = Math.min(MAX_SCALE, scale + 0.1);
+    setScale(newScale);
+  };
+
+  const handleZoomOut = () => {
+    if (!sourceImage) return;
+    saveToHistory();
+    const newScale = Math.max(MIN_SCALE, scale - 0.1);
+    setScale(newScale);
+  };
+
+  const handleRotateLeft = () => {
+    if (!sourceImage) return;
+    saveToHistory();
+    setRotation((prev) => (prev - 15 + 360) % 360);
+  };
+
+  const handleRotateRight = () => {
+    if (!sourceImage) return;
+    saveToHistory();
+    setRotation((prev) => (prev + 15) % 360);
   };
 
   return (
@@ -333,8 +390,8 @@ const ProfilePictureBuilder = () => {
             onChange={(e) => setLanguage(e.target.value)}
             style={{ width: "auto" }}
           >
-            <option value="en">English</option>
             <option value="vi">Tiếng Việt</option>
+            <option value="en">English</option>
           </Form.Select>
         </Col>
       </Row>
@@ -429,7 +486,93 @@ const ProfilePictureBuilder = () => {
               </li>
             </ul>
           </div>
-          <div className="mb-3 d-flex justify-content-between gap-1">
+        </Col>
+        <Col md={6} className="text-center">
+          <canvas
+            ref={canvasRef}
+            width={CANVAS_SIZE}
+            height={CANVAS_SIZE}
+            className="canvas-preview"
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            style={{
+              cursor: sourceImage ? "move" : "default",
+              touchAction: "none",
+            }}
+          ></canvas>
+          <div className="mt-2">
+            <Form.Group className="mb-2">
+              <Form.Label>{t("zoom")}</Form.Label>
+              <div className="d-flex align-items-center">
+                <Button
+                  variant="link"
+                  onClick={handleZoomOut}
+                  disabled={!sourceImage}
+                  className="p-1"
+                >
+                  <FontAwesomeIcon icon={faSearchMinus} />
+                </Button>
+                <FormControl
+                  type="range"
+                  min={MIN_SCALE * 100}
+                  max={MAX_SCALE * 100}
+                  value={zoomValue}
+                  onChange={handleZoomChange}
+                  disabled={!sourceImage}
+                  style={{ flex: 1, margin: "0 10px" }}
+                />
+                <Button
+                  variant="link"
+                  onClick={handleZoomIn}
+                  disabled={!sourceImage}
+                  className="p-1"
+                >
+                  <FontAwesomeIcon icon={faSearchPlus} />
+                </Button>
+              </div>
+            </Form.Group>
+            <Form.Group className="mb-2">
+              <Form.Label>{t("rotation")}</Form.Label>
+              <div className="d-flex align-items-center">
+                <Button
+                  variant="link"
+                  onClick={handleRotateLeft}
+                  disabled={!sourceImage}
+                  className="p-1"
+                >
+                  <FontAwesomeIcon icon={faUndoIcon} />
+                </Button>
+                <FormControl
+                  type="range"
+                  min={-180}
+                  max={180}
+                  value={rotation}
+                  onChange={handleRotationChange}
+                  disabled={!sourceImage}
+                  style={{ flex: 1, margin: "0 10px" }}
+                />
+                <Button
+                  variant="link"
+                  onClick={handleRotateRight}
+                  disabled={!sourceImage}
+                  className="p-1"
+                >
+                  <FontAwesomeIcon icon={faRedo} />
+                </Button>
+              </div>
+            </Form.Group>
+            <small>
+              {t("scale")}: {scale.toFixed(2)} | {t("position")}: (
+              {position.x.toFixed(0)}, {position.y.toFixed(0)}) |{" "}
+              {t("rotation")}: {rotation.toFixed(0)}°
+            </small>
+          </div>
+          <div className="my-5 d-flex justify-content-between gap-1">
             <Button
               variant="secondary"
               onClick={handleReset}
@@ -454,31 +597,6 @@ const ProfilePictureBuilder = () => {
               <FontAwesomeIcon icon={faDownload} className="me-2" />
               {t("download")}
             </Button>
-          </div>
-        </Col>
-        <Col md={6} className="text-center">
-          <canvas
-            ref={canvasRef}
-            width={CANVAS_SIZE}
-            height={CANVAS_SIZE}
-            className="canvas-preview"
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-            style={{
-              cursor: sourceImage ? "move" : "default",
-              touchAction: "none",
-            }}
-          ></canvas>
-          <div className="mt-2">
-            <small>
-              {t("scale")}: {scale.toFixed(2)} | {t("position")}: (
-              {position.x.toFixed(0)}, {position.y.toFixed(0)})
-            </small>
           </div>
         </Col>
       </Row>

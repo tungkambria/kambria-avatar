@@ -16,6 +16,8 @@ const translations = {
     scale: "Scale",
     position: "Position",
     selectFrame: "Select Frame",
+    zoom: "Zoom in/out",
+    rotation: "Rotate",
   },
   vi: {
     title: "Trình tạo ảnh đại diện Facebook",
@@ -32,6 +34,8 @@ const translations = {
     scale: "Tỷ lệ",
     position: "Vị trí",
     selectFrame: "Chọn khung",
+    zoom: "Phóng to/thu nhỏ",
+    rotation: "Xoay",
   },
 };
 
