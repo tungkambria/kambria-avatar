@@ -524,7 +524,7 @@ const ProfilePictureBuilder = () => {
                   value={zoomValue}
                   onChange={handleZoomChange}
                   disabled={!sourceImage}
-                  style={{ flex: 1, margin: "0 10px" }}
+                  style={{ flex: 1, margin: "0 10px", touchAction: "none" }}
                 />
                 <Button
                   variant="link"
@@ -554,7 +554,7 @@ const ProfilePictureBuilder = () => {
                   value={rotation}
                   onChange={handleRotationChange}
                   disabled={!sourceImage}
-                  style={{ flex: 1, margin: "0 10px" }}
+                  style={{ flex: 1, margin: "0 10px", touchAction: "none" }}
                 />
                 <Button
                   variant="link"
