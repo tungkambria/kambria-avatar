@@ -15,7 +15,7 @@ import { LanguageContext } from "../context/LanguageContext";
 
 // Define preset frames
 const presetFrames = [
-  { name: "Heart", url: "/frames/heart.png" },
+  { name: "Circle 0", url: "/frames/circle-0.png" },
   { name: "Circle 1", url: "/frames/circle-1.png" },
   { name: "Circle 2", url: "/frames/circle-2.png" },
   { name: "Circle 3", url: "/frames/circle-3.png" },
