@@ -572,32 +572,36 @@ const ProfilePictureBuilder = () => {
               {t("rotation")}: {rotation.toFixed(0)}°
             </small>
           </div>
-          <div className="my-5 d-flex justify-content-between gap-1">
-            <Button
-              variant="secondary"
-              onClick={handleReset}
-              disabled={!sourceImage}
-            >
-              <FontAwesomeIcon icon={faSyncAlt} className="me-2" />
-              {t("reset")}
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={handleUndo}
-              disabled={!sourceImage || history.length === 0}
-            >
-              <FontAwesomeIcon icon={faUndo} className="me-2" />
-              {t("undo")}
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleDownload}
-              disabled={!sourceImage}
-            >
-              <FontAwesomeIcon icon={faDownload} className="me-2" />
-              {t("download")}
-            </Button>
-          </div>
+        </Col>
+      </Row>
+      <Row className="text-center mt-5 mb-3">
+        <Col>
+          <Button
+            variant="secondary"
+            onClick={handleReset}
+            className="me-2"
+            disabled={!sourceImage}
+          >
+            <FontAwesomeIcon icon={faSyncAlt} className="me-2" />
+            {t("reset")}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={handleUndo}
+            className="me-2"
+            disabled={history.length === 0}
+          >
+            <FontAwesomeIcon icon={faUndo} className="me-2" />
+            {t("undo")}
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleDownload}
+            disabled={!sourceImage}
+          >
+            <FontAwesomeIcon icon={faDownload} className="me-2" />
+            {t("download")}
+          </Button>
         </Col>
       </Row>
     </Container>
