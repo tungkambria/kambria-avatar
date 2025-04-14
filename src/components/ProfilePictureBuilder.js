@@ -25,12 +25,10 @@ import {
 import { LanguageContext } from "../context/LanguageContext";
 
 const presetFrames = [
-  { name: "Circle 0", url: "/frames/circle-0.png" },
-  { name: "Circle 1", url: "/frames/circle-1.png" },
-  { name: "Circle 2", url: "/frames/circle-2.png" },
-  { name: "Circle 3", url: "/frames/circle-3.png" },
-  { name: "Circle 4", url: "/frames/circle-4.png" },
-  { name: "Circle 5", url: "/frames/circle-5.png" },
+  { name: "Option 1", url: "/frames/option-1.png" },
+  { name: "Option 2", url: "/frames/option-2.png" },
+  { name: "Option 3", url: "/frames/option-3.png" },
+  { name: "Option 4", url: "/frames/option-4.png" },
 ];
 
 const ProfilePictureBuilder = () => {
@@ -517,7 +515,7 @@ const ProfilePictureBuilder = () => {
             </Form.Label>
             <Row>
               {presetFrames.map((frame) => (
-                <Col xs={4} key={frame.name} className="mb-2">
+                <Col xs={6} key={frame.name} className="mb-2">
                   <div
                     className={`preset-frame ${
                       selectedPreset === frame.name ? "selected" : ""
@@ -530,8 +528,8 @@ const ProfilePictureBuilder = () => {
                         src={frame.url}
                         alt={frame.name}
                         style={{
-                          width: "100px",
-                          height: "100px",
+                          width: "150px",
+                          height: "150px",
                           objectFit: "cover",
                           border:
                             selectedPreset === frame.name
@@ -542,8 +540,8 @@ const ProfilePictureBuilder = () => {
                     ) : (
                       <div
                         style={{
-                          width: "100px",
-                          height: "100px",
+                          width: "150px",
+                          height: "150px",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
