@@ -17,10 +17,10 @@ import {
   faMousePointer,
   faMobileAlt,
   faBorderAll,
-  faSearchPlus, // New import for zoom in
-  faSearchMinus, // New import for zoom out
+  faSearchPlus,
+  faSearchMinus,
   faRotateLeft,
-  faRotateRight, // Alias for rotate left
+  faRotateRight,
 } from "@fortawesome/free-solid-svg-icons";
 import { LanguageContext } from "../context/LanguageContext";
 
@@ -41,13 +41,14 @@ const ProfilePictureBuilder = () => {
   const [selectedPreset, setSelectedPreset] = useState("None");
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [rotation, setRotation] = useState(0); // New state for rotation (degrees)
+  const [rotation, setRotation] = useState(0);
   const [history, setHistory] = useState([]);
   const canvasRef = useRef(null);
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
   const pinchDistance = useRef(null);
-  const [zoomValue, setZoomValue] = useState(100); // Zoom slider percentage
+  const [zoomValue, setZoomValue] = useState(100);
+  const [dominantColor, setDominantColor] = useState(null);
 
   const CANVAS_SIZE = 400;
   const MAX_OFFSET = 100;
@@ -55,7 +56,6 @@ const ProfilePictureBuilder = () => {
   const MAX_SCALE = 5;
   const MAX_IMAGE_SIZE = 1024;
 
-  // Sync zoom slider with scale changes
   useEffect(() => {
     setZoomValue((scale * 100).toFixed(0));
   }, [scale]);
@@ -63,8 +63,43 @@ const ProfilePictureBuilder = () => {
   const saveToHistory = () => {
     setHistory((prev) => [
       ...prev.slice(-9),
-      { scale, position: { ...position }, rotation }, // Include rotation in history
+      { scale, position: { ...position }, rotation },
     ]);
+  };
+
+  const getDominantColor = (img) => {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = img.width;
+    canvas.height = img.height;
+    ctx.drawImage(img, 0, 0, img.width, img.height);
+
+    const imageData = ctx.getImageData(0, 0, img.width, img.height).data;
+    const colorCount = {};
+
+    for (let i = 0; i < imageData.length; i += 20) {
+      const r = imageData[i];
+      const g = imageData[i + 1];
+      const b = imageData[i + 2];
+      const a = imageData[i + 3];
+
+      if (a === 0) continue;
+
+      const color = `${r},${g},${b}`;
+      colorCount[color] = (colorCount[color] || 0) + 1;
+    }
+
+    let maxCount = 0;
+    let dominant = "255,255,255";
+    for (const [color, count] of Object.entries(colorCount)) {
+      if (count > maxCount) {
+        maxCount = count;
+        dominant = color;
+      }
+    }
+
+    const [r, g, b] = dominant.split(",").map(Number);
+    return `rgb(${r},${g},${b})`;
   };
 
   const preprocessImage = (file, callback) => {
@@ -99,8 +134,14 @@ const ProfilePictureBuilder = () => {
         setScale(1);
         setZoomValue(100);
         setPosition({ x: 0, y: 0 });
-        setRotation(0); // Reset rotation
+        setRotation(0);
         setHistory([]);
+        const img = new Image();
+        img.src = url;
+        img.onload = () => {
+          const color = getDominantColor(img);
+          setDominantColor(color);
+        };
       });
     }
   };
@@ -129,17 +170,23 @@ const ProfilePictureBuilder = () => {
     setScale(Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale)));
   };
 
-  // New handler for rotation slider
   const handleRotationChange = (e) => {
     const newRotation = Number(e.target.value);
     saveToHistory();
     setRotation(newRotation);
   };
 
+  // Modified useEffect to apply dominantColor during live preview
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Fill background with dominant color if available
+    if (dominantColor) {
+      ctx.fillStyle = dominantColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
 
     const drawImages = async () => {
       if (sourceImage) {
@@ -148,12 +195,10 @@ const ProfilePictureBuilder = () => {
         await img.decode();
         const scaledWidth = img.width * scale;
         const scaledHeight = img.height * scale;
-        ctx.save(); // Save context state
-        // Translate to canvas center, rotate, then translate back
+        ctx.save();
         ctx.translate(CANVAS_SIZE / 2, CANVAS_SIZE / 2);
-        ctx.rotate((rotation * Math.PI) / 180); // Convert degrees to radians
+        ctx.rotate((rotation * Math.PI) / 180);
         ctx.translate(-CANVAS_SIZE / 2, -CANVAS_SIZE / 2);
-        // Draw image with position offset
         ctx.drawImage(
           img,
           position.x + (CANVAS_SIZE - scaledWidth) / 2,
@@ -161,7 +206,7 @@ const ProfilePictureBuilder = () => {
           scaledWidth,
           scaledHeight
         );
-        ctx.restore(); // Restore context state
+        ctx.restore();
       }
       if (frameImage) {
         const frame = new Image();
@@ -172,7 +217,7 @@ const ProfilePictureBuilder = () => {
     };
 
     drawImages();
-  }, [sourceImage, frameImage, scale, position, rotation]); // Added rotation dependency
+  }, [sourceImage, frameImage, scale, position, rotation, dominantColor]); // Added dominantColor dependency
 
   const handleMouseDown = (e) => {
     if (!sourceImage) return;
@@ -326,14 +371,14 @@ const ProfilePictureBuilder = () => {
       canvas.removeEventListener("wheel", handleWheel);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }); // Dependencies unchanged
+  });
 
   const handleReset = () => {
     saveToHistory();
     setScale(1);
     setZoomValue(100);
     setPosition({ x: 0, y: 0 });
-    setRotation(0); // Reset rotation
+    setRotation(0);
   };
 
   const handleUndo = () => {
@@ -341,15 +386,72 @@ const ProfilePictureBuilder = () => {
     const lastState = history[history.length - 1];
     setScale(lastState.scale);
     setPosition({ ...lastState.position });
-    setRotation(lastState.rotation); // Restore rotation
+    setRotation(lastState.rotation);
     setHistory((prev) => prev.slice(0, -1));
   };
 
   const handleDownload = () => {
     const canvas = canvasRef.current;
-    canvas.toBlob((blob) => {
-      saveAs(blob, "fb-profile-picture.png");
-    });
+    const ctx = canvas.getContext("2d");
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Fill background with dominant color
+    if (dominantColor) {
+      ctx.fillStyle = dominantColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    if (sourceImage) {
+      const img = new Image();
+      img.src = sourceImage;
+      img.onload = () => {
+        const scaledWidth = img.width * scale;
+        const scaledHeight = img.height * scale;
+        ctx.save();
+        ctx.translate(CANVAS_SIZE / 2, CANVAS_SIZE / 2);
+        ctx.rotate((rotation * Math.PI) / 180);
+        ctx.translate(-CANVAS_SIZE / 2, -CANVAS_SIZE / 2);
+        ctx.drawImage(
+          img,
+          position.x + (CANVAS_SIZE - scaledWidth) / 2,
+          position.y + (CANVAS_SIZE - scaledHeight) / 2,
+          scaledWidth,
+          scaledHeight
+        );
+        ctx.restore();
+
+        if (frameImage) {
+          const frame = new Image();
+          frame.src = frameImage;
+          frame.onload = () => {
+            ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob((blob) => {
+              saveAs(blob, "fb-profile-picture.png");
+            });
+          };
+        } else {
+          canvas.toBlob((blob) => {
+            saveAs(blob, "fb-profile-picture.png");
+          });
+        }
+      };
+    } else {
+      if (frameImage) {
+        const frame = new Image();
+        frame.src = frameImage;
+        frame.onload = () => {
+          ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob((blob) => {
+            saveAs(blob, "fb-profile-picture.png");
+          });
+        };
+      } else {
+        canvas.toBlob((blob) => {
+          saveAs(blob, "fb-profile-picture.png");
+        });
+      }
+    }
   };
 
   const handleZoomIn = () => {
