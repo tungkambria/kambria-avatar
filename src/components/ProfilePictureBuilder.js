@@ -1,4 +1,11 @@
-import React, { useState, useRef, useEffect, useContext } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+  useContext,
+} from "react";
 import {
   Container,
   Row,
@@ -23,6 +30,7 @@ import {
   faRotateRight,
 } from "@fortawesome/free-solid-svg-icons";
 import { LanguageContext } from "../context/LanguageContext";
+import { debounce, throttle } from "lodash";
 
 const presetFrames = [
   { name: "Option 1", url: "/frames/option-1.png" },
@@ -41,12 +49,15 @@ const ProfilePictureBuilder = () => {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [rotation, setRotation] = useState(0);
   const [history, setHistory] = useState([]);
+  const [zoomValue, setZoomValue] = useState(100);
+  const [dominantColor, setDominantColor] = useState(null);
+
   const canvasRef = useRef(null);
+  const sourceImageRef = useRef(null);
+  const frameImageRef = useRef(null);
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
   const pinchDistance = useRef(null);
-  const [zoomValue, setZoomValue] = useState(100);
-  const [dominantColor, setDominantColor] = useState(null);
 
   const CANVAS_SIZE = 400;
   const MAX_OFFSET = 100;
@@ -58,12 +69,12 @@ const ProfilePictureBuilder = () => {
     setZoomValue((scale * 100).toFixed(0));
   }, [scale]);
 
-  const saveToHistory = () => {
+  const saveToHistory = useCallback(() => {
     setHistory((prev) => [
       ...prev.slice(-9),
       { scale, position: { ...position }, rotation },
     ]);
-  };
+  }, [scale, position, rotation]);
 
   const getDominantColor = (img) => {
     const canvas = document.createElement("canvas");
@@ -128,15 +139,16 @@ const ProfilePictureBuilder = () => {
     const file = e.target.files[0];
     if (file) {
       preprocessImage(file, (url) => {
-        setSourceImage(url);
-        setScale(1);
-        setZoomValue(100);
-        setPosition({ x: 0, y: 0 });
-        setRotation(0);
-        setHistory([]);
         const img = new Image();
         img.src = url;
         img.onload = () => {
+          setSourceImage(url);
+          sourceImageRef.current = img;
+          setScale(1);
+          setZoomValue(100);
+          setPosition({ x: 0, y: 0 });
+          setRotation(0);
+          setHistory([]);
           const color = getDominantColor(img);
           setDominantColor(color);
         };
@@ -148,8 +160,13 @@ const ProfilePictureBuilder = () => {
     const file = e.target.files[0];
     if (file) {
       preprocessImage(file, (url) => {
-        setFrameImage(url);
-        setSelectedPreset("None");
+        const frame = new Image();
+        frame.src = url;
+        frame.onload = () => {
+          setFrameImage(url);
+          frameImageRef.current = frame;
+          setSelectedPreset("None");
+        };
       });
     }
   };
@@ -157,300 +174,364 @@ const ProfilePictureBuilder = () => {
   const handlePresetSelect = (presetName) => {
     setSelectedPreset(presetName);
     const preset = presetFrames.find((frame) => frame.name === presetName);
-    setFrameImage(preset.url);
+    const frame = new Image();
+    frame.src = preset.url;
+    frame.onload = () => {
+      frameImageRef.current = frame;
+      setFrameImage(preset.url);
+    };
   };
 
-  const handleZoomChange = (e) => {
-    const newZoom = Number(e.target.value);
-    setZoomValue(newZoom);
-    const newScale = newZoom / 100;
-    saveToHistory();
-    setScale(Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale)));
-  };
+  const debouncedStateUpdate = useRef(
+    debounce((newScale, newPosition, newRotation) => {
+      setScale(newScale);
+      setPosition(newPosition);
+      setRotation(newRotation);
+    }, 50)
+  ).current;
 
-  const handleRotationChange = (e) => {
-    const newRotation = Number(e.target.value);
-    saveToHistory();
-    setRotation(newRotation);
-  };
+  const handleZoomChange = useCallback(
+    (e) => {
+      const newZoom = Number(e.target.value);
+      setZoomValue(newZoom);
+      const newScale = newZoom / 100;
+      saveToHistory();
+      debouncedStateUpdate(
+        Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale)),
+        position,
+        rotation
+      );
+    },
+    [saveToHistory, position, rotation, debouncedStateUpdate]
+  );
 
-  // Modified useEffect to apply dominantColor during live preview
+  const handleRotationChange = useCallback(
+    (e) => {
+      const newRotation = Number(e.target.value);
+      saveToHistory();
+      debouncedStateUpdate(scale, position, newRotation);
+    },
+    [saveToHistory, scale, position, debouncedStateUpdate]
+  );
+
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const offscreenCanvas = document.createElement("canvas");
+    offscreenCanvas.width = CANVAS_SIZE;
+    offscreenCanvas.height = CANVAS_SIZE;
+    const offscreenCtx = offscreenCanvas.getContext("2d");
 
-    // Fill background with dominant color if available
-    if (dominantColor) {
-      ctx.fillStyle = dominantColor;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
+    const drawCanvas = () => {
+      offscreenCtx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-    const drawImages = async () => {
-      if (sourceImage) {
-        const img = new Image();
-        img.src = sourceImage;
-        await img.decode();
+      if (dominantColor) {
+        offscreenCtx.fillStyle = dominantColor;
+        offscreenCtx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+      }
+
+      if (sourceImageRef.current) {
+        const img = sourceImageRef.current;
         const scaledWidth = img.width * scale;
         const scaledHeight = img.height * scale;
-        ctx.save();
-        ctx.translate(CANVAS_SIZE / 2, CANVAS_SIZE / 2);
-        ctx.rotate((rotation * Math.PI) / 180);
-        ctx.translate(-CANVAS_SIZE / 2, -CANVAS_SIZE / 2);
-        ctx.drawImage(
+        offscreenCtx.save();
+        offscreenCtx.translate(CANVAS_SIZE / 2, CANVAS_SIZE / 2);
+        offscreenCtx.rotate((rotation * Math.PI) / 180);
+        offscreenCtx.translate(-CANVAS_SIZE / 2, -CANVAS_SIZE / 2);
+        offscreenCtx.drawImage(
           img,
           position.x + (CANVAS_SIZE - scaledWidth) / 2,
           position.y + (CANVAS_SIZE - scaledHeight) / 2,
           scaledWidth,
           scaledHeight
         );
-        ctx.restore();
+        offscreenCtx.restore();
       }
-      if (frameImage) {
-        const frame = new Image();
-        frame.src = frameImage;
-        await frame.decode();
-        ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+
+      if (frameImageRef.current) {
+        offscreenCtx.drawImage(
+          frameImageRef.current,
+          0,
+          0,
+          CANVAS_SIZE,
+          CANVAS_SIZE
+        );
       }
+
+      ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+      ctx.drawImage(offscreenCanvas, 0, 0);
     };
 
-    drawImages();
-  }, [sourceImage, frameImage, scale, position, rotation, dominantColor]); // Added dominantColor dependency
-
-  const handleMouseDown = (e) => {
-    if (!sourceImage) return;
-    isDragging.current = true;
-    dragStart.current = {
-      x: e.clientX - position.x,
-      y: e.clientY - position.y,
+    let animationFrameId;
+    const renderLoop = () => {
+      drawCanvas();
+      animationFrameId = requestAnimationFrame(renderLoop);
     };
-    saveToHistory();
-  };
+    animationFrameId = requestAnimationFrame(renderLoop);
 
-  const handleMouseMove = (e) => {
-    if (!isDragging.current || !sourceImage) return;
-    const newX = e.clientX - dragStart.current.x;
-    const newY = e.clientY - dragStart.current.y;
-    setPosition({
-      x: Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, newX)),
-      y: Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, newY)),
-    });
-  };
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      if (sourceImage) URL.revokeObjectURL(sourceImage);
+      if (frameImage) URL.revokeObjectURL(frameImage);
+    };
+  }, [sourceImage, frameImage, scale, position, rotation, dominantColor]);
 
-  const handleMouseUp = () => {
-    isDragging.current = false;
-  };
-
-  const handleTouchStart = (e) => {
-    if (!sourceImage) return;
-    e.preventDefault();
-    saveToHistory();
-    const touches = e.touches;
-    if (touches.length === 1) {
+  const handleMouseDown = useCallback(
+    (e) => {
+      if (!sourceImage) return;
       isDragging.current = true;
       dragStart.current = {
-        x: touches[0].clientX - position.x,
-        y: touches[0].clientY - position.y,
+        x: e.clientX - position.x,
+        y: e.clientY - position.y,
       };
-    } else if (touches.length === 2) {
-      const dx = touches[0].clientX - touches[1].clientX;
-      const dy = touches[0].clientY - touches[1].clientY;
-      pinchDistance.current = Math.sqrt(dx * dx + dy * dy);
-    }
-  };
+      saveToHistory();
+    },
+    [sourceImage, position, saveToHistory]
+  );
 
-  const handleTouchMove = (e) => {
-    if (!sourceImage) return;
-    e.preventDefault();
-    const touches = e.touches;
-    if (touches.length === 1 && isDragging.current) {
-      const newX = touches[0].clientX - dragStart.current.x;
-      const newY = touches[0].clientY - dragStart.current.y;
+  const handleMouseMove = useCallback(
+    (e) => {
+      if (!isDragging.current || !sourceImage) return;
+      const newX = e.clientX - dragStart.current.x;
+      const newY = e.clientY - dragStart.current.y;
       setPosition({
         x: Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, newX)),
         y: Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, newY)),
       });
-    } else if (touches.length === 2) {
+    },
+    [sourceImage]
+  );
+
+  const handleMouseUp = useCallback(() => {
+    isDragging.current = false;
+  }, []);
+
+  const handleTouchStart = useCallback(
+    (e) => {
+      if (!sourceImage) return;
+      e.preventDefault();
+      saveToHistory();
+      const touches = e.touches;
+      if (touches.length === 1) {
+        isDragging.current = true;
+        dragStart.current = {
+          x: touches[0].clientX - position.x,
+          y: touches[0].clientY - position.y,
+        };
+      } else if (touches.length === 2) {
+        const dx = touches[0].clientX - touches[1].clientX;
+        const dy = touches[0].clientY - touches[1].clientY;
+        pinchDistance.current = Math.sqrt(dx * dx + dy * dy);
+      }
+    },
+    [sourceImage, position, saveToHistory]
+  );
+
+  const handleSingleTouchMove = useCallback((touch) => {
+    const newX = touch.clientX - dragStart.current.x;
+    const newY = touch.clientY - dragStart.current.y;
+    setPosition({
+      x: Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, newX)),
+      y: Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, newY)),
+    });
+  }, []);
+
+  const handlePinchMove = useCallback(
+    (touches) => {
       const dx = touches[0].clientX - touches[1].clientX;
       const dy = touches[0].clientY - touches[1].clientY;
       const newDistance = Math.sqrt(dx * dx + dy * dy);
-      if (pinchDistance.current) {
-        const scaleChange = newDistance / pinchDistance.current;
-        let newScale = scale * scaleChange;
-        newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
 
-        const pinchCenterX = (touches[0].clientX + touches[1].clientX) / 2;
-        const pinchCenterY = (touches[0].clientY + touches[1].clientY) / 2;
-        const canvasRect = canvasRef.current.getBoundingClientRect();
-        const canvasX = pinchCenterX - canvasRect.left - CANVAS_SIZE / 2;
-        const canvasY = pinchCenterY - canvasRect.top - CANVAS_SIZE / 2;
-
-        const newPositionX =
-          position.x + (canvasX / scale - canvasX / newScale);
-        const newPositionY =
-          position.y + (canvasY / scale - canvasY / newScale);
-
-        setScale(newScale);
-        setPosition({
-          x: Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, newPositionX)),
-          y: Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, newPositionY)),
-        });
+      if (!pinchDistance.current) {
+        pinchDistance.current = newDistance;
+        return;
       }
-      pinchDistance.current = newDistance;
-    }
-  };
 
-  const handleTouchEnd = (e) => {
+      const scaleChange = newDistance / pinchDistance.current;
+      const newScale = Math.max(
+        MIN_SCALE,
+        Math.min(MAX_SCALE, scale * scaleChange)
+      );
+
+      const pinchCenterX = (touches[0].clientX + touches[1].clientX) / 2;
+      const pinchCenterY = (touches[0].clientY + touches[1].clientY) / 2;
+      const canvasRect = canvasRef.current.getBoundingClientRect();
+      const canvasX = pinchCenterX - canvasRect.left - CANVAS_SIZE / 2;
+      const canvasY = pinchCenterY - canvasRect.top - CANVAS_SIZE / 2;
+
+      const newPositionX = position.x + (canvasX / scale - canvasX / newScale);
+      const newPositionY = position.y + (canvasY / scale - canvasY / newScale);
+
+      setScale(newScale);
+      setPosition({
+        x: Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, newPositionX)),
+        y: Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, newPositionY)),
+      });
+
+      pinchDistance.current = newDistance;
+    },
+    [scale, position]
+  );
+
+  // Throttled touch move handler
+  // eslint-disable-next-line
+  const handleTouchMove = useCallback(
+    throttle(
+      (event) => {
+        if (!sourceImage) return;
+        event.preventDefault();
+        const { touches } = event;
+
+        if (touches.length === 1 && isDragging.current) {
+          handleSingleTouchMove(touches[0]);
+        } else if (touches.length === 2) {
+          handlePinchMove(touches);
+        }
+      },
+      50,
+      { leading: true, trailing: true }
+    ),
+    [sourceImage, handleSingleTouchMove, handlePinchMove, isDragging]
+  );
+
+  const handleTouchEnd = useCallback((e) => {
     e.preventDefault();
     isDragging.current = false;
     pinchDistance.current = null;
-  };
+  }, []);
 
-  const handleWheel = (e) => {
-    if (!sourceImage) return;
-    e.preventDefault();
-    saveToHistory();
-    const zoomSpeed = 0.001;
-    const delta = e.deltaY;
-    let newScale = scale - delta * zoomSpeed;
-    newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
-    setScale(newScale);
-  };
-
-  const handleKeyDown = (e) => {
-    if (!sourceImage) return;
-    const step = 5;
-    const zoomStep = 0.05;
-    let newPosition = { ...position };
-    let newScale = scale;
-
-    switch (e.key) {
-      case "ArrowUp":
-        newPosition.y = Math.max(-MAX_OFFSET, position.y - step);
-        saveToHistory();
-        break;
-      case "ArrowDown":
-        newPosition.y = Math.min(MAX_OFFSET, position.y + step);
-        saveToHistory();
-        break;
-      case "ArrowLeft":
-        newPosition.x = Math.max(-MAX_OFFSET, position.x - step);
-        saveToHistory();
-        break;
-      case "ArrowRight":
-        newPosition.x = Math.min(MAX_OFFSET, position.x + step);
-        saveToHistory();
-        break;
-      case "+":
-      case "=":
-        newScale = Math.min(MAX_SCALE, scale + zoomStep);
-        saveToHistory();
-        break;
-      case "-":
-        newScale = Math.max(MIN_SCALE, scale - zoomStep);
-        saveToHistory();
-        break;
-      default:
-        return;
-    }
-
-    if (e.key.startsWith("Arrow")) {
-      setPosition(newPosition);
-    } else if (["+", "=", "-"].includes(e.key)) {
+  const handleWheel = useCallback(
+    (e) => {
+      if (!sourceImage) return;
+      e.preventDefault();
+      saveToHistory();
+      const zoomSpeed = 0.001;
+      const delta = e.deltaY;
+      const newScale = Math.max(
+        MIN_SCALE,
+        Math.min(MAX_SCALE, scale - delta * zoomSpeed)
+      );
       setScale(newScale);
-    }
-  };
+    },
+    [sourceImage, scale, saveToHistory]
+  );
+
+  const throttledHandleWheel = useMemo(
+    () => throttle(handleWheel, 50, { leading: true, trailing: true }),
+    [handleWheel]
+  );
+
+  const handleKeyDown = useCallback(
+    (e) => {
+      if (!sourceImage) return;
+      const step = 5;
+      const zoomStep = 0.05;
+      let newPosition = { ...position };
+      let newScale = scale;
+
+      switch (e.key) {
+        case "ArrowUp":
+          newPosition.y = Math.max(-MAX_OFFSET, position.y - step);
+          saveToHistory();
+          break;
+        case "ArrowDown":
+          newPosition.y = Math.min(MAX_OFFSET, position.y + step);
+          saveToHistory();
+          break;
+        case "ArrowLeft":
+          newPosition.x = Math.max(-MAX_OFFSET, position.x - step);
+          saveToHistory();
+          break;
+        case "ArrowRight":
+          newPosition.x = Math.min(MAX_OFFSET, position.x + step);
+          saveToHistory();
+          break;
+        case "+":
+        case "=":
+          newScale = Math.min(MAX_SCALE, scale + zoomStep);
+          saveToHistory();
+          break;
+        case "-":
+          newScale = Math.max(MIN_SCALE, scale - zoomStep);
+          saveToHistory();
+          break;
+        default:
+          return;
+      }
+
+      if (e.key.startsWith("Arrow")) {
+        setPosition(newPosition);
+      } else if (["+", "=", "-"].includes(e.key)) {
+        setScale(newScale);
+      }
+    },
+    [sourceImage, scale, position, saveToHistory]
+  );
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    canvas.addEventListener("wheel", handleWheel, { passive: false });
+    canvas.addEventListener("wheel", throttledHandleWheel, { passive: false });
     window.addEventListener("keydown", handleKeyDown);
     return () => {
-      canvas.removeEventListener("wheel", handleWheel);
+      canvas.removeEventListener("wheel", throttledHandleWheel);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  });
+  }, [throttledHandleWheel, handleKeyDown]);
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     saveToHistory();
     setScale(1);
     setZoomValue(100);
     setPosition({ x: 0, y: 0 });
     setRotation(0);
-  };
+  }, [saveToHistory]);
 
-  const handleUndo = () => {
+  const handleUndo = useCallback(() => {
     if (history.length === 0) return;
     const lastState = history[history.length - 1];
     setScale(lastState.scale);
     setPosition({ ...lastState.position });
     setRotation(lastState.rotation);
     setHistory((prev) => prev.slice(0, -1));
-  };
+  }, [history]);
 
-  const handleDownload = () => {
+  const handleDownload = useCallback(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Fill background with dominant color
     if (dominantColor) {
       ctx.fillStyle = dominantColor;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    if (sourceImage) {
-      const img = new Image();
-      img.src = sourceImage;
-      img.onload = () => {
-        const scaledWidth = img.width * scale;
-        const scaledHeight = img.height * scale;
-        ctx.save();
-        ctx.translate(CANVAS_SIZE / 2, CANVAS_SIZE / 2);
-        ctx.rotate((rotation * Math.PI) / 180);
-        ctx.translate(-CANVAS_SIZE / 2, -CANVAS_SIZE / 2);
-        ctx.drawImage(
-          img,
-          position.x + (CANVAS_SIZE - scaledWidth) / 2,
-          position.y + (CANVAS_SIZE - scaledHeight) / 2,
-          scaledWidth,
-          scaledHeight
-        );
-        ctx.restore();
-
-        if (frameImage) {
-          const frame = new Image();
-          frame.src = frameImage;
-          frame.onload = () => {
-            ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
-            canvas.toBlob((blob) => {
-              saveAs(blob, "fb-profile-picture.png");
-            });
-          };
-        } else {
-          canvas.toBlob((blob) => {
-            saveAs(blob, "fb-profile-picture.png");
-          });
-        }
-      };
-    } else {
-      if (frameImage) {
-        const frame = new Image();
-        frame.src = frameImage;
-        frame.onload = () => {
-          ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
-          canvas.toBlob((blob) => {
-            saveAs(blob, "fb-profile-picture.png");
-          });
-        };
-      } else {
-        canvas.toBlob((blob) => {
-          saveAs(blob, "fb-profile-picture.png");
-        });
-      }
+    if (sourceImageRef.current) {
+      const img = sourceImageRef.current;
+      const scaledWidth = img.width * scale;
+      const scaledHeight = img.height * scale;
+      ctx.save();
+      ctx.translate(CANVAS_SIZE / 2, CANVAS_SIZE / 2);
+      ctx.rotate((rotation * Math.PI) / 180);
+      ctx.translate(-CANVAS_SIZE / 2, -CANVAS_SIZE / 2);
+      ctx.drawImage(
+        img,
+        position.x + (CANVAS_SIZE - scaledWidth) / 2,
+        position.y + (CANVAS_SIZE - scaledHeight) / 2,
+        scaledWidth,
+        scaledHeight
+      );
+      ctx.restore();
     }
-  };
+
+    if (frameImageRef.current) {
+      ctx.drawImage(frameImageRef.current, 0, 0, canvas.width, canvas.height);
+    }
+
+    canvas.toBlob((blob) => {
+      saveAs(blob, "fb-profile-picture.png");
+    });
+  }, [dominantColor, scale, position, rotation]);
 
   const handleZoomIn = () => {
     if (!sourceImage) return;
